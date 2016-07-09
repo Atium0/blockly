@@ -221,6 +221,64 @@ Blockly.Connection.prototype.connect_ = function(childConnection) {
   if (Blockly.Events.isEnabled()) {
     event = new Blockly.Events.Move(childBlock);
   }
+  // Stefan  
+  // Sorin
+  /* Unify type expressions */
+  var unifyResult;
+  if (parentConnection.typeExpr && childConnection.typeExpr) {
+    unifyResult = parentConnection.typeExpr.unify(childConnection.typeExpr);
+    if (unifyResult === false) {
+      throw 'Attempt to connect incompatible types.';
+    }
+
+    var workspace = parentConnection.getSourceBlock().workspace;
+    var blocks = workspace.getAllBlocks();
+    if (workspace.flyout_) {
+      blocks = blocks.concat(workspace.flyout_.workspace_.getAllBlocks());
+    }
+    for (var i = 0; i < blocks.length; i++) {
+      var block = blocks[i]
+      // process connections
+      var connections = block.getConnections_(true);
+      for (var j = 0; j < connections.length; j++) {
+        if (connections[j].typeExpr) {
+          connections[j].typeExpr = connections[j].typeExpr.apply(unifyResult);
+        }
+      }
+
+      // process block type params if any
+      if (block.typeParams) {
+        for (var f in block.typeParams) {
+          block.typeParams[f] = block.typeParams[f].apply(unifyResult);
+        }
+      }
+      if( block.outputConnection && block.outputConnection.typeExpr ) {
+        /* Update colour of blocks in case their output type has changed */
+        block.setColourByType( block.outputConnection.typeExpr );
+      }
+      if( block.rendered ) {
+        block.render();
+      }
+    }
+
+    // var typeVarBlock;
+    // if (this.typeExpr.isTypeVar()) {
+    //   typeVarBlock = this.sourceBlock_
+    // } else {
+    //   typeVarBlock = otherConnection.sourceBlock_
+    // }
+    // var connections = typeVarBlock.getConnections_(true)
+    // for (var x = 0; x < connections.length; x++) {
+    //   if (connections[x].typeExpr) {
+    //     connections[x].typeExpr = connections[x].typeExpr.apply(unifyResult);
+    //   }
+    // }
+    Blockly.TypeVar.triggerGarbageCollection();
+  }
+
+
+
+
   // Establish the connections.
   Blockly.Connection.connectReciprocally_(parentConnection, childConnection);
   // Demote the inferior block so that one is a child of the superior one.
@@ -229,6 +287,29 @@ Blockly.Connection.prototype.connect_ = function(childConnection) {
     event.recordNew();
     Blockly.Events.fire(event);
   }
+
+// Stefan, possibly extra?
+  if (parentBlock.rendered) {
+    parentBlock.updateDisabled();
+  }
+  if (childBlock.rendered) {
+    childBlock.updateDisabled();
+  }
+  if (parentBlock.rendered && childBlock.rendered) {
+    if (parentConnection.type == Blockly.NEXT_STATEMENT ||
+        parentConnection.type == Blockly.PREVIOUS_STATEMENT) {
+      // Child block may need to square off its corners if it is in a stack.
+      // Rendering a child will render its parent.
+      childBlock.render();
+    } else {
+      // Child block does not change shape.  Rendering the parent node will
+      // move its connected children into position.
+      parentBlock.render();
+    }
+  }
+
+
+
 };
 
 /**
@@ -241,12 +322,21 @@ Blockly.Connection.prototype.dispose = function() {
   if (this.inDB_) {
     this.db_.removeConnection_(this);
   }
+  // Stefan
   if (Blockly.highlightedConnection_ == this) {
     Blockly.highlightedConnection_ = null;
   }
   if (Blockly.localConnection_ == this) {
     Blockly.localConnection_ = null;
   }
+
+  if (this.typeVarPaths_) {
+    for (var i = 0; i < this.typeVarPaths_.length; i++) {
+      goog.dom.removeNode(this.typeVarPaths_[i]);
+      delete this.typeVarPaths_[i];
+    }
+  }
+
   this.db_ = null;
   this.dbOpposite_ = null;
 };
@@ -302,6 +392,7 @@ Blockly.Connection.prototype.canConnectWithReason_ = function(target) {
   } else if (blockA && blockB && blockA.workspace !== blockB.workspace) {
     return Blockly.Connection.REASON_DIFFERENT_WORKSPACES;
   } else if (!this.checkType_(target)) {
+    
     return Blockly.Connection.REASON_CHECKS_FAILED;
   } else if (blockA.isShadow() && !blockB.isShadow()) {
     return Blockly.Connection.REASON_SHADOW_PARENT;
@@ -494,6 +585,69 @@ Blockly.Connection.prototype.disconnect = function() {
   }
   this.disconnectInternal_(parentBlock, childBlock);
   parentConnection.respawnShadow_();
+
+  // Stefan
+  // Anthony
+
+  var workspace = parentBlock.workspace;
+  Blockly.Events.disable();
+  // Reconstruct parent and child blocks to restore type variables 
+  if( workspace ) {  // workspace is non-null for user-initiated disconnections
+    // Find top-level ancestor block
+    var rootBlock = parentBlock.getRootBlock();
+    // Export top-level ancestor to xml
+    var rootDom = Blockly.Xml.blockToDom( rootBlock );
+    // Re-construct block but without rendering it
+    var newRootBlock = Blockly.Xml.domToBlockHeadless_(rootDom, workspace);
+    // Copy connection types from new block to old
+    rootBlock.copyConnectionTypes_( newRootBlock, true );
+    // Delete temporary block
+    newRootBlock.dispose();
+    
+    // Now do child block
+    // Export child block to xml
+    var childDom = Blockly.Xml.blockToDom( childBlock );
+    // Re-construct block but without rendering it
+    var newChildBlock = Blockly.Xml.domToBlockHeadless_(childDom, workspace);
+    
+    // Copy connection types from new block to old
+    childBlock.copyConnectionTypes_( newChildBlock, false );
+    
+    // Delete temporary blocks
+    newChildBlock.dispose();
+    //  Blockly.TypeVar.triggerGarbageCollection(); // Don't think this is necessary
+  }
+  Blockly.Events.enable();
+  // Blocks have already been re-rendered in copyConnectionTypes_. Just need to update disabled status.
+  if (childBlock.rendered) {
+    childBlock.updateDisabled();
+  }
+
+  if(parentBlock.type == 'procedures_letFunc')
+  {
+    var name = parentBlock.getFieldValue("NAME");
+    var workspace = Blockly.getMainWorkspace();
+
+    var callers = Blockly.Procedures.getCallers(name, workspace);
+    var tp = parentBlock.getInput("RETURN").connection.getTypeExpr();
+    callers.forEach(function(block)
+    {
+      var conn = block.outputConnection.targetConnection;
+      var isConnected = block.outputConnection.isConnected();
+
+      block.setOutputTypeExpr(tp);
+
+      if(isConnected)
+      {
+        block.outputConnection.disconnect();
+        block.outputConnection.connect(conn);
+      }
+      block.render();
+
+    });
+
+  }
+
 };
 
 /**
@@ -557,6 +711,27 @@ Blockly.Connection.prototype.targetBlock = function() {
  * @private
  */
 Blockly.Connection.prototype.checkType_ = function(otherConnection) {
+  // Stefan
+  /* Check if polymorphic types match */
+
+  
+
+  var isStatement = otherConnection.type == Blockly.NEXT_STATEMENT || otherConnection.type == Blockly.PREVIOUS_CONNECTION;
+  if(isStatement)
+    return true; // Stefan, Temp Fix
+
+  var unifyResult = true;
+  if (this.typeExpr && otherConnection.typeExpr) {
+    unifyResult = this.typeExpr.unify(otherConnection.typeExpr);
+  }
+  // STEFAN, TODO CHANGE IF TYPES DONT MATCH ANYMORE
+  else if (!this.typeExpr && otherConnection.typeExpr) {
+    // return false;
+  }
+  else if (this.typeExpr && !otherConnection.typeExpr) {
+    // return false;
+  }
+
   if (!this.check_ || !otherConnection.check_) {
     // One or both sides are promiscuous enough that anything will fit.
     return true;
@@ -582,8 +757,15 @@ Blockly.Connection.prototype.setCheck = function(check) {
   if (check) {
     // Ensure that check is in an array.
     if (!goog.isArray(check)) {
+      /* Passed a single type. Set TypeExpr to specific type. */
+      this.setTypeExpr( new Blockly.TypeExpr( check ) );
       check = [check];
+    } else {
+      /* Passed an array. Set TypeExpr to a type variable. */
+      this.setTypeExpr( Blockly.TypeVar.getUnusedTypeVar() );
     }
+
+
     this.check_ = check;
     // The new value type may not be compatible with the existing connection.
     if (this.isConnected() && !this.checkType_(this.targetConnection)) {
@@ -594,9 +776,21 @@ Blockly.Connection.prototype.setCheck = function(check) {
     }
   } else {
     this.check_ = null;
+    this.setTypeExpr( Blockly.TypeVar.getUnusedTypeVar() );
   }
   return this;
 };
+
+Blockly.Connection.prototype.setTypeExpr = function(t) {
+  this.typeExpr = t;
+  return this;
+}
+
+Blockly.Connection.prototype.getTypeExpr = function() {
+  return this.typeExpr;
+}
+
+
 
 /**
  * Change a connection's shadow block.

@@ -27,6 +27,8 @@
 goog.provide('Blockly.RenderedConnection');
 
 goog.require('Blockly.Connection');
+goog.require('Blockly.TypeExpr');
+goog.require('Blockly.TypeVar');
 
 
 /**
@@ -189,7 +191,7 @@ Blockly.RenderedConnection.prototype.closest = function(maxLimit, dx, dy) {
 Blockly.RenderedConnection.prototype.highlight = function() {
   var steps;
   if (this.type == Blockly.INPUT_VALUE || this.type == Blockly.OUTPUT_VALUE) {
-    steps = 'm 0,0 ' + Blockly.BlockSvg.TAB_PATH_DOWN + ' v 5';
+    steps = 'm 0,0 ' + Blockly.BlockSvg.getDownPath(this) +  ' v 5';
   } else {
     steps = 'm -20,0 h 5 ' + Blockly.BlockSvg.NOTCH_PATH_LEFT + ' h 5';
   }
@@ -303,6 +305,13 @@ Blockly.RenderedConnection.prototype.isConnectionAllowed = function(candidate,
     return false;
   }
 
+  // Type checking.
+  var canConnect = this.canConnectWithReason_(candidate);
+  if (canConnect != Blockly.Connection.CAN_CONNECT &&
+      canConnect != Blockly.Connection.REASON_MUST_DISCONNECT) {
+    return false;
+  }
+
   return Blockly.RenderedConnection.superClass_.isConnectionAllowed.call(this,
       candidate);
 };
@@ -393,3 +402,87 @@ Blockly.RenderedConnection.prototype.connect_ = function(childConnection) {
     }
   }
 };
+
+// Stefan
+// Sorin
+Blockly.Connection.prototype.renderTypeVarHighlights = function() {
+
+  if (this.typeVarPaths_) {
+    for (var i = 0; i < this.typeVarPaths_.length; i++) {
+      goog.dom.removeNode(this.typeVarPaths_[i]);
+      delete this.typeVarPaths_[i];
+    }
+  }
+  this.typeVarPaths_ = [];
+  var xy = this.sourceBlock_.getRelativeToSurfaceXY();
+  var x = this.x_ - xy.x;
+  var y = this.y_ - xy.y;
+  var typeVarHighlights = Blockly.BlockSvg.typeVarHighlights(this.typeExpr);
+  for (var i = 0; i < typeVarHighlights.length; i++) {
+    var highlight = typeVarHighlights[i];
+    this.typeVarPaths_.push(
+      Blockly.createSvgElement(
+        'path', {
+          'class': 'blocklyTypeVarPath',
+          stroke: highlight.color,
+          d: highlight.path,
+          transform: 'translate(' + x + ', ' + y + ')'
+        },
+        this.sourceBlock_.getSvgRoot()));
+  }
+}
+
+/**
+ * Adds color if this is a type variable connection
+ * Sorin
+ */
+Blockly.Connection.prototype.addColor = function() {
+  if (this.coloredPath_) {
+    goog.dom.removeNode(this.coloredPath_);
+    delete this.coloredPath_;
+  }
+  if (!(this.typeExpr)) {
+    return;
+  }
+  if (!(this.typeExpr.isTypeVar())) {
+    return;
+  }
+  var steps;
+  if (this.type == Blockly.INPUT_VALUE || this.type == Blockly.OUTPUT_VALUE) {
+    // Sorin
+    steps = 'm 0,0 ' + Blockly.BlockSvg.getDownPath(this) +  ' v 5';
+    //steps = 'm 0,0 l -8,10 8,10 v 5';
+    // var tabWidth = Blockly.RTL ? -Blockly.BlockSvg.TAB_WIDTH :
+    //                              Blockly.BlockSvg.TAB_WIDTH;
+    // steps = 'm 0,0 v 5 c 0,10 ' + -tabWidth + ',-8 ' + -tabWidth + ',7.5 s ' +
+    //         tabWidth + ',-2.5 ' + tabWidth + ',7.5 v 5';
+  } else {
+    if (Blockly.RTL) {
+      steps = 'm 20,0 h -5 l -6,4 -3,0 -6,-4 h -5';
+    } else {
+      steps = 'm -20,0 h 5 l 6,4 3,0 6,-4 h 5';
+    }
+  }
+  var xy = this.sourceBlock_.getRelativeToSurfaceXY();
+  var x = this.x_ - xy.x;
+  var y = this.y_ - xy.y;
+  
+  this.coloredPath_ = Blockly.createSvgElement(
+    'path', {
+      'class': 'blocklyTypeVarPath',
+      stroke: Blockly.TypeVar.getTypeVarColor(this.typeExpr.name),
+      d: steps,
+      transform: 'translate(' + x + ', ' + y + ')'
+    },
+    this.sourceBlock_.getSvgRoot());
+
+  // this.coloredPath_ = Blockly.createSvgElement('path',
+  //     {class: 'blocklyHighlightedConnectionPath' + 
+  //                Blockly.TypeVar.getTypeVarColor(this.typeExpr.name),
+  //      stroke: Blockly.TypeVar.getTypeVarColor(this.typeExpr.name),
+  //      d: steps,
+  //      transform: 'translate(' + x + ', ' + y + ')'},
+  //     this.sourceBlock_.getSvgRoot());
+};
+
+

@@ -804,12 +804,14 @@ Blockly.Events.disableOrphans = function(event) {
       if (block.getParent() && !block.getParent().disabled) {
         do {
           block.setDisabled(false);
+          block.setWarningText(null);
           block = block.getNextBlock();
         } while (block);
       } else if ((block.outputConnection || block.previousConnection) &&
                  Blockly.dragMode_ == Blockly.DRAG_NONE) {
         do {
           block.setDisabled(true);
+          block.setWarningText("Block is disconnected and isolated from the main program");
           block = block.getNextBlock();
         } while (block);
       }

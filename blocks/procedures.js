@@ -512,6 +512,25 @@ Blockly.Blocks['procedures_callnoreturn'] = {
       this.quarkConnections_ = {};
       this.quarkIds_ = null;
     }
+
+     // StefanJ
+    // Set the type to that of the defining block
+    var defBlockMain = Blockly.Procedures.getDefinition(this.getProcedureCall(),
+          Blockly.getMainWorkspace()); 
+
+    if (defBlockMain)
+    {
+      if (defBlockMain.type == "procedures_letFunc")
+      {
+        var tp = defBlockMain.getInput("RETURN").connection.getTypeExpr();
+        this.setOutputTypeExpr(tp);
+        this.setColourByType(tp);
+        if(this.outputConnection.typeExpr)
+          this.outputConnection.typeExpr.unify(tp);
+        this.render();
+      }
+    }
+
     if (!paramIds) {
       // Reset the quarks (a mutator is about to open).
       return;
@@ -582,6 +601,11 @@ Blockly.Blocks['procedures_callnoreturn'] = {
    * @this Blockly.Block
    */
   updateShape_: function() {
+    var defBlockMain = Blockly.Procedures.getDefinition(this.getProcedureCall(),
+          Blockly.getMainWorkspace()); 
+    if(!defBlockMain)
+      return;
+
     for (var i = 0; i < this.arguments_.length; i++) {
       var field = this.getField('ARGNAME' + i);
       if (field) {
@@ -605,19 +629,11 @@ Blockly.Blocks['procedures_callnoreturn'] = {
       this.removeInput('ARG' + i);
       i++;
     }
-    // Add 'with:' if there are parameters, remove otherwise.
-    var topRow = this.getInput('TOPROW');
-    if (topRow) {
-      if (this.arguments_.length) {
-        if (!this.getField('WITH')) {
-          topRow.appendField(Blockly.Msg.PROCEDURES_CALL_BEFORE_PARAMS, 'WITH');
-          topRow.init();
-        }
-      } else {
-        if (this.getField('WITH')) {
-          topRow.removeField('WITH');
-        }
-      }
+
+    // set input types correctly
+    for(var i = 0; i < this.arguments_.length; i++)
+    {
+      this.getInput('ARG' + i).setTypeExpr(defBlockMain.argTypes_[i]);
     }
   },
   /**

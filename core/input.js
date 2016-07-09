@@ -239,3 +239,21 @@ Blockly.Input.prototype.dispose = function() {
   }
   this.sourceBlock_ = null;
 };
+
+// Stefan
+Blockly.Input.prototype.setTypeExpr = function(t) {
+  if (!this.connection) {
+    throw 'This input does not have a connection.';
+  }
+  this.connection.setTypeExpr(t);
+  return this;
+};
+
+Blockly.Input.prototype.getTypeExpr = function() {
+  if (!this.connection) {
+    return null;
+  }
+  return this.connection.getTypeExpr();
+};
+
+

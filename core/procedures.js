@@ -134,6 +134,17 @@ Blockly.Procedures.isLegalName = function(name, workspace, opt_exclude) {
  * @this {!Blockly.Field}
  */
 Blockly.Procedures.rename = function(text) {
+
+  // Stefan
+  // Check if names conform to Haskell def requirements
+  if(/[^a-z_]/.test( text[0] ) )
+    return null; // functions may not start with non-alpha numeric chars
+
+  if(/[^a-zA-Z0-9_]/.test( text ) )
+    return null;
+
+
+
   // Strip leading and trailing whitespace.  Beyond this, all names are legal.
   text = text.replace(/^[\s\xa0]+|[\s\xa0]+$/g, '');
 
@@ -156,27 +167,54 @@ Blockly.Procedures.rename = function(text) {
  */
 Blockly.Procedures.flyoutCategory = function(workspace) {
   var xmlList = [];
+  // Stefan
+  // Disable all procedures except let
   if (Blockly.Blocks['procedures_defnoreturn']) {
     // <block type="procedures_defnoreturn" gap="16"></block>
     var block = goog.dom.createDom('block');
     block.setAttribute('type', 'procedures_defnoreturn');
     block.setAttribute('gap', 16);
-    xmlList.push(block);
+    // xmlList.push(block);
   }
   if (Blockly.Blocks['procedures_defreturn']) {
     // <block type="procedures_defreturn" gap="16"></block>
     var block = goog.dom.createDom('block');
     block.setAttribute('type', 'procedures_defreturn');
     block.setAttribute('gap', 16);
-    xmlList.push(block);
+    //xmlList.push(block);
   }
   if (Blockly.Blocks['procedures_ifreturn']) {
     // <block type="procedures_ifreturn" gap="16"></block>
     var block = goog.dom.createDom('block');
     block.setAttribute('type', 'procedures_ifreturn');
     block.setAttribute('gap', 16);
+    // xmlList.push(block);
+  }
+  if (Blockly.Blocks['procedures_letVar']) {
+    var block = goog.dom.createDom('block');
+    block.setAttribute('type', 'procedures_letVar');
+    block.setAttribute('gap', 16);
+    // xmlList.push(block);
+  }
+  if (Blockly.Blocks['procedures_letFunc']) {
+    var block = goog.dom.createDom('block');
+    block.setAttribute('type', 'procedures_letFunc');
+    block.setAttribute('gap', 16);
     xmlList.push(block);
   }
+  if (Blockly.Blocks['procedures_getVar']) {
+    // <block type="procedures_defreturn" gap="16"></block>
+    var block = goog.dom.createDom('block');
+    block.setAttribute('type', 'procedures_getVar');
+    block.setAttribute('gap', 16);
+    xmlList.push(block);
+  }
+
+
+
+
+
+
   if (xmlList.length) {
     // Add slightly larger gap between system blocks and user calls.
     xmlList[xmlList.length - 1].setAttribute('gap', 24);
@@ -293,3 +331,7 @@ Blockly.Procedures.getDefinition = function(name, workspace) {
   }
   return null;
 };
+
+
+
+

@@ -127,3 +127,22 @@ Blockly.FieldNumber.prototype.numberValidator = function(text) {
   n = goog.math.clamp(n, this.min_, this.max_);
   return String(n);
 };
+
+// Stefan
+/**
+ * Ensure that a number is entered
+ * @param {string} text The user's text.
+ * @return {?string} A string representing a valid number, or null if invalid.
+ */
+Blockly.FieldNumber.prototype.basicNumberValidator = function(text) {
+  if (text === null) {
+    return null;
+  }
+  text = String(text);
+  var n = Number(text);
+  if (isNaN(n)) {
+    return null;
+  }
+  n = goog.math.clamp(n, this.min_, this.max_);
+  return String(n);
+};

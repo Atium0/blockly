@@ -756,5 +756,43 @@ Blockly.Css.CONTENT = [
     'padding: 0;',
   '}',
 
+  '.blocklyTypeVarPath {',
+   '  stroke-width: 2px;',
+   '  fill: none;',
+   '}',
+ 
+   '.blocklyHighlightedConnectionPathBlue {',
+   '  stroke-width: 3px;',
+   '  stroke: blue;',
+   '  fill: none;',
+   '}',
+ 
+   '.blocklyHighlightedConnectionPathRed {',
+   '  stroke-width: 3px;',
+   '  stroke: red;',
+   '  fill: none;',
+   '}',
+ 
+   '.blocklyHighlightedConnectionPathGreen {',
+   '  stroke-width: 3px;',
+   '  stroke: green;',
+   '  fill: none;',
+   '}',
+ 
+   '.blocklyHighlightedConnectionPathYellow {',
+   '  stroke-width: 3px;',
+   '  stroke: yellow;',
+   '  fill: none;',
+   '}',
+ 
+   '.blocklyHighlightedConnectionPathCyan {',
+   '  stroke-width: 3px;',
+   '  stroke: cyan;',
+   '  fill: none;',
+   '}',
+ 
+ 
+
+
   ''
 ];

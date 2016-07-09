@@ -184,3 +184,69 @@ Blockly.Variables.generateUniqueName = function(workspace) {
   }
   return newName;
 };
+
+
+
+// Gets the type of a variable name over all blocks
+Blockly.Variables.getTypeOfVariable = function(name)
+{
+  var blocks = Blockly.mainWorkspace.getAllBlocks();
+  for (var i = 0; i < blocks.length; i++) {
+    if (blocks[i].getVarsWithTypes) {
+      var varsWithTypes = blocks[i].getVarsWithTypes();
+      if (name in varsWithTypes) {
+        return varsWithTypes[name];
+      }
+    }
+    return null;
+  }
+};
+
+// Gets the type of a variable name from a block or its parents
+Blockly.Variables.getTypeOfVariable = function(name, block)
+{
+  var par = block;
+  while(par)
+  {
+   if (par.getVarsWithTypes) {
+     var varsWithTypes = par.getVarsWithTypes();
+     if (name in varsWithTypes) 
+     {
+       return varsWithTypes[name];
+     }
+     par = par.getParent();
+    }
+  }
+};
+
+// Returns a distinct list of variables of this block and its parents
+Blockly.Variables.getVariablesUp = function(block)
+{
+  var uniq_fast = function (a) {
+    var seen = {};
+    var out = [];
+    var len = a.length;
+    var j = 0;
+    for(var i = 0; i < len; i++) {
+         var item = a[i];
+         if(seen[item] !== 1) {
+               seen[item] = 1;
+               out[j++] = item;
+         }
+    }
+    return out;
+  };
+
+  var list = [];
+  var par = block;
+  while(par)
+  {
+    if(par.getVars)
+      par.getVars().forEach(function(v){
+        list.push(v);
+      });
+
+    par = par.getParent();
+  }
+  return uniq_fast(list);
+};

@@ -31,6 +31,8 @@ goog.require('Blockly.Comment');
 goog.require('Blockly.Connection');
 goog.require('Blockly.Input');
 goog.require('Blockly.Mutator');
+goog.require('Blockly.TypeExpr');
+goog.require('Blockly.TypeVar');
 goog.require('Blockly.Warning');
 goog.require('Blockly.Workspace');
 goog.require('Blockly.Xml');
@@ -237,6 +239,8 @@ Blockly.Block.prototype.dispose = function(healStack) {
     connections[i].dispose();
   }
   Blockly.Events.enable();
+
+  Blockly.TypeVar.triggerGarbageCollection();
 };
 
 /**
@@ -1345,3 +1349,116 @@ Blockly.Block.prototype.moveBy = function(dx, dy) {
 Blockly.Block.prototype.makeConnection_ = function(type) {
   return new Blockly.Connection(this, type);
 };
+
+
+Blockly.Block.prototype.setOutputTypeExpr = function(typeExpr) {
+  if( !this.outputConnection ) this.setOutput( true );  /* Should call setOutput() first, but just in case... */
+  this.outputConnection.setTypeExpr(typeExpr);
+}
+
+Blockly.Block.prototype.getOutputTypeExpr = function() {
+  if( !this.outputConnection )
+    return null;
+  this.outputConnection.getTypeExpr();
+}
+
+Blockly.Block.prototype.setColourByType = function(typeExpr) {
+  if( !typeExpr && this.outputConnection && this.outputConnection.typeExpr ) typeExpr = this.outputConnection.typeExpr;
+  var colour;
+  if( typeExpr ) {
+    if( typeExpr.isTypeVar() ) {
+      colour = Blockly.BlockSvg.ABSTRACT_COLOUR;
+    }
+    else if( !(colour = Blockly.BlockSvg.getShapeForType( typeExpr.name ).blockColour) ) {
+      colour = 180;  /* A default colour */
+    }
+  } else {
+    colour = 180;
+  }
+  this.setColour( colour );
+  return( colour );
+  /* TODO: Provide some way to manually override colours? Eg allow slightly different shade for quantifiers */
+}
+
+
+
+// Stefan
+// (But actually Anthony)
+
+/**
+ * Copy the connection types from the given block to this block.
+ * @param {Blockly.Block} source Block to copy types from. Assumed to be the same block type as this block.
+ * @param {bool} keepVars If true, existing type variables should be kept if possible; if false, type variables will be replaced with those from source.
+ */
+Blockly.Block.prototype.copyConnectionTypes_ = function(source, keepVars) {
+//  console.log( "copyConnectionTypes:", this, source, keepVars );
+  if( !source ) return;
+  Blockly.Block.copyConnectionTypesR_( this, source, {}, keepVars );
+}
+ 
+/* Recursive worker version of copyConnectionTypes_ */
+Blockly.Block.copyConnectionTypesR_ = function(dest, source, subst, keepVars) {
+  // Copy output type
+  if( dest.outputConnection && source.outputConnection ) {
+    // If both are type variables, keep the existing type variable and add a substitution rule
+    if( source.outputConnection.typeExpr.isTypeVar() && dest.outputConnection.typeExpr.isTypeVar() && keepVars ) {
+      subst[source.outputConnection.typeExpr.name] = dest.outputConnection.typeExpr;
+    }
+    
+    // Apply any accumulated substititions
+    var substResult = source.outputConnection.typeExpr.apply( subst );
+
+    dest.outputConnection.setCheck( source.outputConnection.check_ );
+    dest.outputConnection.setTypeExpr( substResult );
+    dest.setColourByType();
+  }
+  
+  // Process inputs
+  for (var i = 0, destInput; destInput = dest.inputList[i]; i++) {
+    var sourceInput = source.getInput( destInput.name );
+    if( sourceInput ) { 
+      if( sourceInput.connection && sourceInput.connection.typeExpr && destInput.connection.typeExpr) {  // connection will be null for dummy inputs
+//        console.log( "copyConnectionTypes_: sourceInput.connection for connection '" + destInput.name + "' is OK", sourceInput );
+        
+        // If both are type variables, keep the existing type variable and add a substitution rule
+        if( sourceInput.connection.typeExpr.isTypeVar() && destInput.connection.typeExpr.isTypeVar() && keepVars ) {
+          subst[sourceInput.connection.typeExpr.name] = destInput.connection.typeExpr;
+        }
+
+        // Apply any accumulated substititions
+        var substResult = sourceInput.connection.typeExpr.apply( subst );
+        
+        // Copy input type
+        destInput.connection.setCheck( sourceInput.connection.check_ );
+        destInput.connection.setTypeExpr( substResult );
+
+        if( destInput.connection.targetConnection && sourceInput.connection.targetConnection ) {
+          // Recursively copy types to child block
+          subst = Blockly.Block.copyConnectionTypesR_( destInput.connection.targetConnection.sourceBlock_, sourceInput.connection.targetConnection.sourceBlock_, subst, keepVars );
+        }
+      }
+    }
+  }
+  dest.render();  // Not very efficient perhaps...
+  return( subst );
+};
+
+// Stefan
+/**
+ * Returns whether all inputs have blocks connected to them
+ */
+Blockly.Block.prototype.allInputsConnected = function(){
+  for (var i = 0, input; input = this.inputList[i]; i++) {
+    if(!input.name)
+      continue;
+    if(input.name=='')
+      continue;
+    if (!input.connection.targetBlock()) {
+      return false;
+    }
+  }
+  return true;
+
+};
+
+

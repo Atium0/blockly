@@ -951,6 +951,26 @@ Blockly.Flyout.prototype.filterForCapacity_ = function() {
       block.setDisabled(allBlocks.length > remainingCapacity);
     }
   }
+
+  // Stefan
+  // Only allow one top level program block
+  var workspaceBlocks = Blockly.getMainWorkspace().getTopBlocks(false);
+  var programBlocks = 0;
+  var programBlockList = ["cwAnimationOf", "cwDrawingOf"];
+  for(var j = 0, blockW; blockW = workspaceBlocks[j]; j++)
+  {
+    if(programBlockList.indexOf(blockW.type) > -1)
+      programBlocks += 1;
+  }
+  if(programBlocks > 0)
+  {
+    for (var i = 0, block; block = blocks[i]; i++) {
+
+      if(programBlockList.indexOf(block.type) > -1)
+        block.setDisabled(true);
+    }
+  }
+
 };
 
 /**
